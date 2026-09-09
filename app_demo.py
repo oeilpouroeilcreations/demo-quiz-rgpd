@@ -1,0 +1,141 @@
+import json
+import os
+import openai
+import streamlit as st
+
+st.set_page_config(
+    page_title="Démo Quiz RGPD - Personnalisation Secteur", page_icon="🎯"
+)
+
+st.title("🎯 Démo : Quiz RGPD Personnalisés par Secteur")
+st.write(
+    "Testez la génération dynamique d'évaluations adaptées au secteur de vos clients."
+)
+
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    api_key = st.sidebar.text_input("Clé API OpenAI :", type="password")
+
+if not api_key:
+    st.info("👈 Veuillez entrer une clé API OpenAI dans la barre latérale.")
+    st.stop()
+
+client = openai.OpenAI(api_key=api_key)
+
+PROGRAMME_6_MODULES = [
+    {
+        "id": 1,
+        "titre": "Module 1: Protection de la vie privée",
+        "notion": "Contexte global et cadres réglementaires",
+    },
+    {
+        "id": 2,
+        "titre": "Module 2: Nature des données",
+        "notion": "Données ordinaires vs sensibles, anonymisation",
+    },
+    {
+        "id": 3,
+        "titre": "Module 3: Les 6 règles d'or",
+        "notion": "Finalité, minimisation, sécurité, conservation",
+    },
+    {
+        "id": 4,
+        "titre": "Module 4: Usages sectoriels",
+        "notion": "Bonnes pratiques applicables aux opérations",
+    },
+    {
+        "id": 5,
+        "titre": "Module 5: Droits & Responsabilités",
+        "notion": "Droits des personnes et obligations des organisations",
+    },
+    {
+        "id": 6,
+        "titre": "Module 6: Le GDPR au quotidien",
+        "notion": "Vigilance, culture de sécurité, minimisation",
+    },
+]
+
+
+def generer_parcours_complet(secteur):
+    prompt = f"""
+    Tu es un expert e-learning RGPD. Génère un parcours de 6 questions à choix multiples adaptées au secteur "{secteur}".
+    
+    Pour CHAQUE module ci-dessous, crée 1 mise en situation concrète du secteur avec 3 propositions (1 seule vraie) :
+    {json.dumps(PROGRAMME_6_MODULES, ensure_ascii=False)}
+    
+    Format JSON strict attendu :
+    {{
+      "questions": [
+        {{
+          "module_id": 1,
+          "titre_module": "Titre du module",
+          "scenario": "Court scénario métier...",
+          "question": "Question posée ?",
+          "options": ["Proposition 1", "Proposition 2", "Proposition 3"],
+          "reponse_correcte": 0,
+          "explication": "Feedback pédagogique..."
+        }}
+      ]
+    }}
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        response_format={"type": "json_object"},
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return json.loads(response.choices[0].message.content)["questions"]
+
+
+secteur_choisi = st.selectbox(
+    "Sélectionnez le secteur d'activité de l'entreprise cliente :",
+    [
+        "Santé & Établissements médicaux",
+        "BTP & Construction",
+        "Immobilier & Promotion",
+        "Grande Distribution & E-commerce",
+        "Banque & Assurance",
+        "Transport & Logistique",
+    ],
+)
+
+if st.button("🚀 Générer le parcours de 6 quiz", type="primary"):
+    with st.spinner("Génération du parcours sur mesure par l'IA..."):
+        st.session_state["quiz_data"] = generer_parcours_complet(secteur_choisi)
+        st.session_state["etape"] = 0
+        st.session_state["score"] = 0
+
+if "quiz_data" in st.session_state:
+    questions = st.session_state["quiz_data"]
+    i = st.session_state["etape"]
+
+    if i < len(questions):
+        q = questions[i]
+        st.divider()
+        st.caption(f"Question {i+1}/6 — {q['titre_module']}")
+        st.subheader(q["scenario"])
+        st.write(f"**{q['question']}**")
+
+        choix = st.radio("Choisissez votre réponse :", q["options"], key=f"q_{i}")
+
+        if st.button("Valider la réponse"):
+            index_choisi = q["options"].index(choix)
+            if index_choisi == q["reponse_correcte"]:
+                st.success("✅ Bonne réponse !")
+                st.session_state["score"] += 1
+            else:
+                st.error("❌ Mauvaise réponse.")
+            st.info(f"💡 **Explication :** {q['explication']}")
+
+            if st.button("Question suivante ➡️"):
+                st.session_state["etape"] += 1
+                st.rerun()
+
+    else:
+        st.divider()
+        st.balloons()
+        st.success(
+            f"🎉 **Parcours terminé !** Score final : {st.session_state['score']}/6"
+        )
+        if st.button("Recommencer une démonstration"):
+            del st.session_state["quiz_data"]
+            st.rerun()
