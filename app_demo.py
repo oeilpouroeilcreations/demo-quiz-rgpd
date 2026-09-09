@@ -1,5 +1,4 @@
 import json
-import os
 import openai
 import streamlit as st
 
@@ -12,9 +11,12 @@ st.write(
     "Testez la génération dynamique d'évaluations adaptées au secteur de vos clients."
 )
 
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    api_key = st.sidebar.text_input("Clé API OpenAI :", type="password")
+# Gestion de la clé API via la barre latérale ou les secrets
+api_key = st.sidebar.text_input(
+    "Clé API OpenAI :",
+    type="password",
+    value=st.secrets.get("OPENAI_API_KEY", ""),
+)
 
 if not api_key:
     st.info("👈 Veuillez entrer une clé API OpenAI dans la barre latérale.")
