@@ -1,4 +1,5 @@
 import json
+import random
 import openai
 import streamlit as st
 
@@ -83,7 +84,15 @@ def generer_parcours_complet(secteur):
         response_format={"type": "json_object"},
         messages=[{"role": "user", "content": prompt}],
     )
-    return json.loads(response.choices[0].message.content)["questions"]
+    questions = json.loads(response.choices[0].message.content)["questions"]
+
+    # Mélanger aléatoirement les réponses pour chaque question
+    for q in questions:
+        bonne_reponse_texte = q["options"][q["reponse_correcte"]]
+        random.shuffle(q["options"])
+        q["reponse_correcte"] = q["options"].index(bonne_reponse_texte)
+
+    return questions
 
 
 secteur_choisi = st.selectbox(
