@@ -11,15 +11,13 @@ st.write(
     "Testez la génération dynamique d'évaluations adaptées au secteur de vos clients."
 )
 
-# Gestion de la clé API via la barre latérale ou les secrets
-api_key = st.sidebar.text_input(
-    "Clé API OpenAI :",
-    type="password",
-    value=st.secrets.get("OPENAI_API_KEY", ""),
-)
+# Récupération de la clé API via les Secrets Streamlit Cloud
+api_key = st.secrets.get("OPENAI_API_KEY", "")
+if not api_key:
+    api_key = st.sidebar.text_input("Clé API OpenAI :", type="password")
 
 if not api_key:
-    st.info("👈 Veuillez entrer une clé API OpenAI dans la barre latérale.")
+    st.info("👈 Veuillez configurer la clé API OpenAI.")
     st.stop()
 
 client = openai.OpenAI(api_key=api_key)
@@ -101,10 +99,11 @@ secteur_choisi = st.selectbox(
 )
 
 if st.button("🚀 Générer le parcours de 6 quiz", type="primary"):
-    with st.spinner("Génération du parcours sur mesure par l'IA..."):
+    with st.spinner("Génération des 6 questions sur mesure par l'IA..."):
         st.session_state["quiz_data"] = generer_parcours_complet(secteur_choisi)
         st.session_state["etape"] = 0
         st.session_state["score"] = 0
+        st.session_state["repondu"] = False
 
 if "quiz_data" in st.session_state:
     questions = st.session_state["quiz_data"]
@@ -119,17 +118,26 @@ if "quiz_data" in st.session_state:
 
         choix = st.radio("Choisissez votre réponse :", q["options"], key=f"q_{i}")
 
-        if st.button("Valider la réponse"):
-            index_choisi = q["options"].index(choix)
+        if not st.session_state.get("repondu", False):
+            if st.button("Valider la réponse"):
+                index_choisi = q["options"].index(choix)
+                st.session_state["dernier_choix"] = index_choisi
+                st.session_state["repondu"] = True
+                if index_choisi == q["reponse_correcte"]:
+                    st.session_state["score"] += 1
+                st.rerun()
+
+        else:
+            index_choisi = st.session_state["dernier_choix"]
             if index_choisi == q["reponse_correcte"]:
                 st.success("✅ Bonne réponse !")
-                st.session_state["score"] += 1
             else:
                 st.error("❌ Mauvaise réponse.")
             st.info(f"💡 **Explication :** {q['explication']}")
 
             if st.button("Question suivante ➡️"):
                 st.session_state["etape"] += 1
+                st.session_state["repondu"] = False
                 st.rerun()
 
     else:
