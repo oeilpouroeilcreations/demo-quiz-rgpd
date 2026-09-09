@@ -86,11 +86,17 @@ def generer_parcours_complet(secteur):
     )
     questions = json.loads(response.choices[0].message.content)["questions"]
 
-    # Mélanger aléatoirement les réponses pour chaque question
+    # Mélanger de façon stricte et isolée
     for q in questions:
-        bonne_reponse_texte = q["options"][q["reponse_correcte"]]
-        random.shuffle(q["options"])
-        q["reponse_correcte"] = q["options"].index(bonne_reponse_texte)
+        options_originales = list(q["options"])
+        bonne_reponse_texte = options_originales[q["reponse_correcte"]]
+        
+        # Mélange des options
+        options_melangees = list(options_originales)
+        random.shuffle(options_melangees)
+        
+        q["options"] = options_melangees
+        q["reponse_correcte"] = options_melangees.index(bonne_reponse_texte)
 
     return questions
 
@@ -125,23 +131,43 @@ if "quiz_data" in st.session_state:
         st.subheader(q["scenario"])
         st.write(f"**{q['question']}**")
 
-        choix = st.radio("Choisissez votre réponse :", q["options"], key=f"q_{i}")
-
         if not st.session_state.get("repondu", False):
+            choix = st.radio(
+                "Choisissez votre réponse :",
+                q["options"],
+                index=None,
+                key=f"q_{i}"
+            )
+
             if st.button("Valider la réponse"):
-                index_choisi = q["options"].index(choix)
-                st.session_state["dernier_choix"] = index_choisi
-                st.session_state["repondu"] = True
-                if index_choisi == q["reponse_correcte"]:
-                    st.session_state["score"] += 1
-                st.rerun()
+                if choix is None:
+                    st.warning("⚠️ Veuillez sélectionner une option avant de valider.")
+                else:
+                    index_choisi = q["options"].index(choix)
+                    st.session_state["dernier_choix"] = index_choisi
+                    st.session_state["repondu"] = True
+                    if index_choisi == q["reponse_correcte"]:
+                        st.session_state["score"] += 1
+                    st.rerun()
 
         else:
             index_choisi = st.session_state["dernier_choix"]
+            
+            # Afficher le choix fait
+            for idx, opt in enumerate(q["options"]):
+                if idx == q["reponse_correcte"]:
+                    st.markdown(f"✅ **{opt}** *(Bonne réponse)*")
+                elif idx == index_choisi:
+                    st.markdown(f"❌ **{opt}** *(Votre choix)*")
+                else:
+                    st.markdown(f"⚪ {opt}")
+
+            st.write("")
             if index_choisi == q["reponse_correcte"]:
-                st.success("✅ Bonne réponse !")
+                st.success("✅ Excellent !")
             else:
-                st.error("❌ Mauvaise réponse.")
+                st.error("❌ Incorrect.")
+
             st.info(f"💡 **Explication :** {q['explication']}")
 
             if st.button("Question suivante ➡️"):
